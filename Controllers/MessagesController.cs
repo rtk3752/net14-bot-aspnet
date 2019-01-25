@@ -30,7 +30,8 @@ namespace SimpleBot
         {
             if ( activity != null && activity.Type == ActivityTypes.Message)
             {
-                InsertActivityLog(activity.Text, activity.From.Name);
+                InsertActivityLog(activity);
+
                 await HandleActivityAsync(activity);
             }
 
@@ -38,20 +39,6 @@ namespace SimpleBot
             return new HttpResponseMessage(HttpStatusCode.Accepted);
         }
 
-        private static void InsertActivityLog(string mensagem, string userName)
-        {
-            var client = new MongoClient();
-            var db = client.GetDatabase("BotDB");
-            var col = db.GetCollection<BsonDocument>("tbl_historico");
-            var doc = new BsonDocument() {
-                { "Criado", DateTime.Now },
-                { "Mensagem", mensagem },
-                { "UserName", userName }
-            };
-
-            col.InsertOne(doc);
-        }
-        
         // Estabelece comunicacao entre o usuario e o SimpleBotUser
         async Task HandleActivityAsync(Activity activity)
         {
@@ -74,7 +61,39 @@ namespace SimpleBot
 
             await connector.Conversations.ReplyToActivityAsync(reply);
 
-            InsertActivityLog(text, "BOT");
+            message.Text = text; // Gambiarrinha rapida
+            InsertActivityLog(message, isBot:true);
+        }
+
+        private static void InsertActivityLog(Activity activity, bool isBot = false)
+        {
+            string id = activity.From.Id;
+            string name = activity.From.Name;
+            string message = activity.Text;
+
+            if (isBot)
+            {
+                id = "0";
+                name = "BOT";
+            }
+
+            InsertActivityLog(id, name, message);
+        }
+
+        private static void InsertActivityLog(string userId, string userName, string mensagem)
+        {
+            var client = new MongoClient();
+            
+            var col = Mongoloide.GetMongoCollection<BsonDocument>("BotDB", "tbl_historico");
+
+            var doc = new BsonDocument() {
+                { "Criado", DateTime.Now },
+                { "Mensagem", mensagem },
+                { "UserId", userId },
+                { "UserName", userName }
+            };
+
+            col.InsertOne(doc);
         }
     }
 }
