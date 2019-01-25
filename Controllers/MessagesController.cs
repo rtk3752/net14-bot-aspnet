@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Description;
 using Microsoft.Bot.Connector;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using SimpleBot.Logic;
 
 namespace SimpleBot
@@ -28,6 +30,7 @@ namespace SimpleBot
         {
             if ( activity != null && activity.Type == ActivityTypes.Message)
             {
+                InsertActivityLog(activity.Text, activity.From.Name);
                 await HandleActivityAsync(activity);
             }
 
@@ -35,6 +38,20 @@ namespace SimpleBot
             return new HttpResponseMessage(HttpStatusCode.Accepted);
         }
 
+        private static void InsertActivityLog(string mensagem, string userName)
+        {
+            var client = new MongoClient();
+            var db = client.GetDatabase("BotDB");
+            var col = db.GetCollection<BsonDocument>("tbl_historico");
+            var doc = new BsonDocument() {
+                { "Criado", DateTime.Now },
+                { "Mensagem", mensagem },
+                { "UserName", userName }
+            };
+
+            col.InsertOne(doc);
+        }
+        
         // Estabelece comunicacao entre o usuario e o SimpleBotUser
         async Task HandleActivityAsync(Activity activity)
         {
@@ -56,6 +73,8 @@ namespace SimpleBot
             var reply = message.CreateReply(text);
 
             await connector.Conversations.ReplyToActivityAsync(reply);
+
+            InsertActivityLog(text, "BOT");
         }
     }
 }
